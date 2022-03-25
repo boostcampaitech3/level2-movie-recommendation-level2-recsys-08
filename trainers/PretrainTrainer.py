@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import tqdm
 from torch.optim import Adam
-from trainers import Trainer
+from trainers.Trainer import Trainer
 
 from utils import ndcg_k, recall_at_k
 

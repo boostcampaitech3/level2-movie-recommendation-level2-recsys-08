@@ -4,9 +4,9 @@ import os
 import torch
 from torch.utils.data import DataLoader, SequentialSampler
 
-from datasets import SASRecDataset
-from models import S3RecModel
-from trainers import FinetuneTrainer
+from datasets.SASRecDataset import SASRecDataset
+from models.S3Rec import S3RecModel
+from trainers.FinetuneTrainer import FinetuneTrainer
 from utils import (
     check_path,
     generate_submission_file,
@@ -19,7 +19,7 @@ from utils import (
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_dir", default="../data/train/", type=str)
+    parser.add_argument("--data_dir", default="/opt/ml/input/data/train/", type=str)
     parser.add_argument("--output_dir", default="output/", type=str)
     parser.add_argument("--data_name", default="Ml", type=str)
     parser.add_argument("--do_eval", action="store_true")

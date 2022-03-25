@@ -6,9 +6,9 @@ import torch
 from torch.utils.data import DataLoader, RandomSampler
 
 # 사용자 정의 모듈 import
-from datasets import PretrainDataset
-from models import S3RecModel
-from trainers import PretrainTrainer
+from datasets.PretrainDataset import PretrainDataset
+from models.S3Rec import S3RecModel
+from trainers.PretrainTrainer import PretrainTrainer
 from utils import (
     EarlyStopping,
     check_path,
@@ -21,7 +21,7 @@ from utils import (
 def main():
     parser = argparse.ArgumentParser()  # parsing 객체 생성
 
-    parser.add_argument("--data_dir", default="../data/train/", type=str)  # 학습에 사용될 데이터 directory 지정
+    parser.add_argument("--data_dir", default="/opt/ml/input/data/train/", type=str)  # 학습에 사용될 데이터 directory 지정
     parser.add_argument("--output_dir", default="output/", type=str)  # 학습 결과를 저장할 directory 지정
     parser.add_argument("--data_name", default="Ml", type=str)
 

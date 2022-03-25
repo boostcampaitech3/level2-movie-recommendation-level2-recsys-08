@@ -5,7 +5,7 @@ import tqdm
 from torch.optim import Adam
 
 from utils import ndcg_k, recall_at_k
-from trainers import Trainer
+from trainers.Trainer import Trainer
 
 
 class FinetuneTrainer(Trainer):
