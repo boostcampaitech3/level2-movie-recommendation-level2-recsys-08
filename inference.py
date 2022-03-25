@@ -68,7 +68,10 @@ def main():
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
 
     args = parser.parse_args()
+    inference_sasrec(args)
 
+
+def inference_sasrec(args):
     set_seed(args.seed)
     check_path(args.output_dir)
 

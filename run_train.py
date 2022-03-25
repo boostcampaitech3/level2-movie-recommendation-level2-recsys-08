@@ -70,7 +70,10 @@ def main():
     parser.add_argument("--using_pretrain", action="store_true")
 
     args = parser.parse_args()
+    train_sasrec(args)
 
+
+def train_sasrec(args):
     set_seed(args.seed)  # seed setting
     check_path(args.output_dir)  # output 파일 저장할 디렉토리 확인 후 생성
 
