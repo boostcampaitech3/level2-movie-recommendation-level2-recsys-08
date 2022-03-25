@@ -83,6 +83,10 @@ def main():
 
     args = parser.parse_args()
 
+
+
+# ================================= 여기서부터 분할하기!!!
+def SAStrain(args):
     set_seed(args.seed)  # argument로 준 seed값 세팅
     check_path(args.output_dir)  # output_dir 경로 존재여부 확인
 
