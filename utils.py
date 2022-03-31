@@ -97,11 +97,11 @@ def avg_pooling(x, dim):
 
 def generate_rating_matrix_valid(user_seq, num_users, num_items):
     # three lists are used to construct sparse matrix
-    row = []
-    col = []
+    row = []  # user의 id만 저장
+    col = []  # item(영화)의 id만 저장 (중복 포함)
     data = []
     for user_id, item_list in enumerate(user_seq):
-        for item in item_list[:-2]:  #
+        for item in item_list[:-2]:  # 마지막 2개 제외
             row.append(user_id)
             col.append(item)
             data.append(1)
@@ -120,7 +120,7 @@ def generate_rating_matrix_test(user_seq, num_users, num_items):
     col = []
     data = []
     for user_id, item_list in enumerate(user_seq):
-        for item in item_list[:-1]:  #
+        for item in item_list[:-1]:  # 마지막 1개 제외
             row.append(user_id)
             col.append(item)
             data.append(1)
@@ -170,17 +170,17 @@ def generate_submission_file(data_file, preds):
 
 def get_user_seqs(data_file):
     rating_df = pd.read_csv(data_file)
-    lines = rating_df.groupby("user")["item"].apply(list)
-    user_seq = []
-    item_set = set()
-    for line in lines:
+    lines = rating_df.groupby("user")["item"].apply(list)  # user들이 본 영화 리스트 목록
+    user_seq = []  # 각 user들이 본 영화 리스트 자체를 element로 저장한 리스트
+    item_set = set()  # 이전까지의 user들에 대한 unique 영화 리스트
+    for line in lines:  # 개별 user의 영화 리스트에 대해
 
         items = line
         user_seq.append(items)
         item_set = item_set | set(items)
-    max_item = max(item_set)
+    max_item = max(item_set)  # unique한 영화 리스트 중 (영화 번호 상) 가장 마지막 영화
 
-    num_users = len(lines)
+    num_users = len(lines)  # 전체 user 인원 수
     num_items = max_item + 2
 
     valid_rating_matrix = generate_rating_matrix_valid(user_seq, num_users, num_items)
@@ -220,6 +220,90 @@ def get_item2attribute_json(data_file):
         attribute_set = attribute_set | set(attributes)  # 전체 영화에 대한 unique 장르 set 생성
     attribute_size = max(attribute_set)
     return item2attribute, attribute_size
+
+
+### 새롭게 추가한 부분!!
+def deepfm_data_setting(data_file, genre_data):
+    ## Rating df 생성
+    raw_rating_df = pd.read_csv(data_file)
+    raw_rating_df['rating'] = 1.0  # implicit feedback
+    raw_rating_df.drop(['time'],axis=1,inplace=True)
+    users = set(raw_rating_df.loc[:, 'user'])  # user set
+    items = set(raw_rating_df.loc[:, 'item'])  # item set 
+
+
+    ## Genre df 생성
+    # main script 측에서 argument로 genres.tsv 경로 변수를 만들어서 이를 인자로 받아 사용해야 한다.
+    # genre_data = args.data_dir + "genres.tsv"   # main script 측에서 해줘야 할 일
+    raw_genre_df = pd.read_csv(genre_data, sep='\t')
+    raw_genre_df = raw_genre_df.drop_duplicates(subset=['item']) # item별 하나의 장르만 남도록 drop
+    genre_dict = {genre:i for i, genre in enumerate(set(raw_genre_df['genre']))}  # 장르를 number로 mapping
+    raw_genre_df['genre']  = raw_genre_df['genre'].map(lambda x : genre_dict[x]) #genre id로 변경
+
+    ## Negative instance 생성
+    num_negative = 50  # 각 user당 50개 생성
+    user_group_dfs = list(raw_rating_df.groupby('user')['item'])  # 각 user당 rating 남긴 영화 리스트
+    first_row = True
+    user_neg_dfs = pd.DataFrame()  # 전체 user들의 negative sampling 데이터 dataframe
+
+    for u, u_items in user_group_dfs:
+        u_items = set(u_items)  # 특정 user의 영화 목록
+        i_user_neg_item = np.random.choice(list(items - u_items), num_negative, replace=False)  # 특정 user가 고르지 않은 영화 50개 선정
+        
+        i_user_neg_df = pd.DataFrame({'user': [u]*num_negative, 'item': i_user_neg_item, 'rating': [0]*num_negative})  # negative sampling dataframe 생성
+        if first_row == True:
+            user_neg_dfs = i_user_neg_df
+            first_row = False
+        else:
+            user_neg_dfs = pd.concat([user_neg_dfs, i_user_neg_df], axis = 0, sort=False)
+
+    raw_rating_df = pd.concat([raw_rating_df, user_neg_dfs], axis = 0, sort=False)  # 기존 train set + negative sampling 데이터
+    
+    ## Join dfs
+    joined_rating_df = pd.merge(raw_rating_df, raw_genre_df, left_on='item', right_on='item', how='inner')
+    
+
+    ## user, item을 zero-based index로 mapping
+    users = sorted(list(set(joined_rating_df.loc[:,'user'])))  # unique user list
+    items =  sorted(list(set((joined_rating_df.loc[:, 'item']))))  # unique item list
+    genres =  sorted(list(set((joined_rating_df.loc[:, 'genre']))))  # unique genre list
+
+    # unique user list가 0-based index가 아닌 경우
+    if len(users)-1 != max(users):
+        users_dict = {users[i]: i for i in range(len(users))}
+        joined_rating_df['user']  = joined_rating_df['user'].map(lambda x : users_dict[x])
+        users = list(set(joined_rating_df.loc[:,'user']))
+
+    # unique item list가 0-based index가 아닌 경우
+    if len(items)-1 != max(items):
+        items_dict = {items[i]: i for i in range(len(items))}
+        joined_rating_df['item']  = joined_rating_df['item'].map(lambda x : items_dict[x])
+        items =  list(set((joined_rating_df.loc[:, 'item'])))
+
+    joined_rating_df = joined_rating_df.sort_values(by=['user'])  # 합친 dataframe을 user를 기준으로 정렬
+    joined_rating_df.reset_index(drop=True, inplace=True)
+
+    data = joined_rating_df
+
+    n_user, n_item, n_genre = len(users), len(items), len(genres)
+
+
+    # user, item, genre를 각각의 tensor로 변경
+    user_col = torch.tensor(data.loc[:,'user'])
+    item_col = torch.tensor(data.loc[:,'item'])
+    genre_col = torch.tensor(data.loc[:,'genre'])
+
+    # 각 tensor에 offset을 더한다.
+    offsets = [0, n_user, n_user+n_item]
+    for col, offset in zip([user_col, item_col, genre_col], offsets):  # user_col : 0, item_col : n_user, genre_col : n_user+n_item
+        col += offset
+
+
+    ### return value가 될 것들    
+    X = torch.cat([user_col.unsqueeze(1), item_col.unsqueeze(1), genre_col.unsqueeze(1)], dim=1)  # shape:[6722471, 3]
+    y = torch.tensor(list(data.loc[:,'rating']))  # rating 내역 존재 여부
+
+    return X, y, n_user, n_item, n_genre
 
 
 def get_metric(pred_list, topk=10):
